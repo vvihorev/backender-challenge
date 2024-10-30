@@ -1,10 +1,12 @@
 # Die Hard
 
-Проект для тестового задания middle-backend developer.
+This is a project with a test task for backend developers.
 
-Требования к тестовому заданию можно найти по [ссылке](docs/task.md)
+You can find detailed requirements by clicking the links:
+- [English version](docs/task_en.md)
+- [Russian version](docs/task_ru.md)
 
-Тех стек:
+Tech stack:
 - Python 3.13
 - Django 5
 - pytest
@@ -12,20 +14,23 @@
 - PostgreSQL
 - ClickHouse
 
-## Installing 
+## Installation
 
-Положите файл `.env` в директорию `src/core`, например:
+Put a `.env` file into the `src/core` directory. You can start with a template file:
 
 ```
 cp src/core/.env.ci src/core/.env
 ```
 
-Затем:
+Run the containers with
 ```
-make migrations
-make migrate
-make superuser
 make run
+```
+
+and then run the installation script with:
+
+```
+make install
 ```
 
 ## Tests

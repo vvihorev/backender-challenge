@@ -57,14 +57,12 @@ def test_event_log_entry_published(
     f_use_case.execute(request)
     log = f_ch_client.query("SELECT * FROM default.event_log WHERE event_type = 'user_created'")
 
-    assert log.result_rows != [
-        [
-            (
-                'user_created',
-                ANY,
-                'Local',
-                UserCreated(email=email, first_name='Test', last_name='Testovich').model_dump_json(),
-                1,
-            ),
-        ],
+    assert log.result_rows == [
+        (
+            'user_created',
+            ANY,
+            'Local',
+            UserCreated(email=email, first_name='Test', last_name='Testovich').model_dump_json(),
+            1,
+        ),
     ]
