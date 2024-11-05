@@ -7,8 +7,9 @@ You will be given a short description of a problem along with several basic rest
 As we expect the candidate to be able to work (or quickly adapt to) our tech stack,
 you will also be given a list of recommended technologies.
 
-You are expected to send a pull request in a public fork on Github or an archive with code to 
-[mcproger7@gmail.com](mailto:mcproger7@gmail.com) with a clear subject and author name so that we can provide feedback.
+
+As a result create repository from this repo template and submit the link to your repository via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
+
 
 The repository must contain:
 
@@ -24,7 +25,7 @@ The repository must contain:
 - Docker & docker-compose
 - PostgreSQL
 - Celery & Celery beat
-- ClickHouse
+- ClickHouse (already installed in docker)
 
 ## The Problem
 
