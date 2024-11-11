@@ -9,9 +9,9 @@ you will also be given a list of recommended technologies.
 
 
 As a result:
-1 create repository from this repo template 
-2 all your changes make as pull request
-3 submit the link to pull request via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
+1. create repository from this repo template 
+2. all your changes make as pull request
+3. submit the link to pull request via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
 
 
 The repository must contain:
