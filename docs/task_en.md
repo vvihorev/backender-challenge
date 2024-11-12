@@ -2,7 +2,7 @@
 
 Expected completion time: 3-5 hours
 
-You will be given a short description of a problem, along with several basic restrictions and requirements. The task will evaluate your ability to implement a solution using our tech stack, and we expect a well-documented and maintainable codebase that adheres to best practices.
+Below a short description of a problem, along with several basic restrictions and requirements. The task will evaluate your ability to implement a solution using our tech stack, and we expect a well-documented and maintainable codebase that adheres to best practices.
 
 Deliverables
 - Repository: Fork the provided repository template and submit your work as a pull request via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
