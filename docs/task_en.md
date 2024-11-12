@@ -43,3 +43,5 @@ Solution Simplicity: Avoid using Kafka or file storage like AWS S3. Stick with a
 - Avoid Redundant Patterns: Ensure any design patterns add real value. Avoid patterns that simply wrap the ORM without enhancing readability or abstraction.
 - Reusability and Separation of Concerns: Decouple core log-processing logic from Celery tasks to increase reusability.
 - Testing: Where possible, test directly against the ClickHouse instance included in Docker. Avoid using mocks unnecessarily.
+
+tips: Teamlead Review [comments from previos hiring](https://docs.google.com/spreadsheets/d/1S_I4E7wtbob8rcmypViGBisWG7w-72e1x0alnPs8Prg/edit?gid=1887153698#gid=1887153698)
