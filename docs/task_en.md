@@ -2,64 +2,44 @@
 
 Expected completion time: 3-5 hours
 
-You will be given a short description of a problem along with several basic restrictions and requirements.
+You will be given a short description of a problem, along with several basic restrictions and requirements. The task will evaluate your ability to implement a solution using our tech stack, and we expect a well-documented and maintainable codebase that adheres to best practices.
 
-As we expect the candidate to be able to work (or quickly adapt to) our tech stack,
-you will also be given a list of recommended technologies.
+Deliverables
+- Repository: Fork the provided repository template and submit your work as a pull request via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
+- Documentation: Include a brief manual on how to set up the project with your changes. Provide documentation that explains your technical solution and design choices. Including an architectural diagram is optional but recommended.
+- Code Quality: Ensure your code is readable, maintainable, and formatted consistently.
+- Testing: Implement comprehensive unit tests for all new code. Use pytest with pytest-django for fixtures where appropriate.
+- Logs and Tracing: Implement structured logging using structlog (which is already included in the project) and add tracing using Sentry transactions or similar.
 
-
-As a result:
-1. create repository from this repo template 
-2. all your changes make as pull request
-3. submit the link to pull request via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
-
-
-The repository must contain:
-
-- a short manual on how to set up the project after the changes
-- code with tests, logs and tracing (you can use sentry transactions)
-- documentation that describes your technical solution and design (you can optionally provide a diagram)
 
 ## Stack
 
-- Python
-- Django
-- pytest (pytest-django preferred for fixtures)
-- Docker & docker-compose
-- PostgreSQL
-- Celery & Celery beat
-- ClickHouse (already installed in docker)
+- Tech Stack
+- Languages and Frameworks: Python, Django
+- Testing: pytest (pytest-django preferred for fixtures)
+- Infrastructure: Docker & docker-compose
+- Database: PostgreSQL
+- Background Tasks: Celery & Celery Beat
+- Logging Database: ClickHouse (included in the Docker environment)
 
 ## The Problem
+Our application sends event logs, which are later used for business analysis, incident investigations, and security audits. Logs are currently sent directly to ClickHouse in a column-based "One Big Table" (OBT) format:
 
-Our application sends event logs that are later used for business analysis, incident investigations and security audits.
+| Column           | Type     |
+|------------------|----------|
+| event_type       | String   |
+| event_date_time  | DateTime |
+| environment      | String   |
+| event_context    | JSON     |
+| metadata_version | UInt64   |
 
-To store these logs we use a column-based database Clickhouse and the so-called One Big Table (further referred to as OBT) - a wide table that
-contains the following columns (the columns may be extended in the future):
 
-```
-event_type: String
-event_date_time: DateTime
-environment: String
-event_context: String // JSON field with unstructured payload
-metadata_version: UInt64 // for versioning purposes
-```
-
-The application pushes logs synchronously directly to CH, see an example in the `CreateUser` use case.
-
-This approach has caused several problems, such as:
-
-- due to the lack of transactionality logs are missed in case of a web-worker failure before the business-logic step is executed
-- Clickhouse network write errors cause poor UX
-- Clickhouse struggles with large numbers of small inserts (see https://clickhouse.com/blog/common-getting-started-issues-with-clickhouse#many-small-inserts)
-
-We need to implement a new write mechanism that will eliminate those problems and provide a convenient interface for publishing logs
-
-**Restrictions and requirements:**
-
-- for the sake of simplicity we don't want to use Kafka for event streaming.
-- we don't want to use Clickhouse-specific features such as RabbitMQ/Kafka engine for publishing logs since there is a chance that Clickhouse will be replaced with another database down the line
-- we don't want to use external file storage, like AWS S3
-- the `event_context` field contains unstructured JSON payload up to N MBytes so it may not be a good idea to push it directly to a queue
-- `Transactional outbox pattern` might be useful for this problem
-- we would like to see a simple and efficient solution that uses a well-known tech stack for ease of maintenance, monitoring and debugging
+## Requirements
+- Pattern Choice: Use the transactional outbox pattern or a similar well-documented approach.
+Solution Simplicity: Avoid using Kafka or file storage like AWS S3. Stick with a simple and efficient solution that utilizes well-known technologies to keep the setup maintainable and monitorable.
+- Batching: Implement batching to minimize the number of inserts to ClickHouse, reducing system strain.
+- Avoid Hardcoding: Do not hardcode values like URLs; follow the 12-factor app principles.
+- Logging and Error Handling: Integrate with existing structured logging (structlog) to avoid fragmentation.
+- Avoid Redundant Patterns: Ensure any design patterns add real value. Avoid patterns that simply wrap the ORM without enhancing readability or abstraction.
+- Reusability and Separation of Concerns: Decouple core log-processing logic from Celery tasks to increase reusability.
+- Testing: Where possible, test directly against the ClickHouse instance included in Docker. Avoid using mocks unnecessarily.
