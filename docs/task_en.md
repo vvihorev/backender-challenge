@@ -33,6 +33,13 @@ Our application sends event logs, which are later used for business analysis, in
 | event_context    | JSON     |
 | metadata_version | UInt64   |
 
+This approach has caused several problems, such as:
+
+due to the lack of transactionality logs are missed in case of a web-worker failure before the business-logic step is executed
+Clickhouse network write errors cause poor UX
+Clickhouse struggles with large numbers of small inserts (see https://clickhouse.com/blog/common-getting-started-issues-with-clickhouse#many-small-inserts)
+We need to implement a new write mechanism that will eliminate those problems and provide a convenient interface for publishing logs
+
 
 ## Requirements
 - Pattern Choice: Use the transactional outbox pattern or a similar well-documented approach.
