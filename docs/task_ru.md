@@ -31,11 +31,15 @@
 | event_context     | JSON      |
 | metadata_version  | UInt64    |
 
-This approach has caused several problems, such as:
-- due to the lack of transactionality logs are missed in case of a web-worker failure before the business-logic step is executed
-- Clickhouse network write errors cause poor UX
-- Clickhouse struggles with large numbers of small inserts (see https://clickhouse.com/blog/common-getting-started-issues-with-clickhouse#many-small-inserts)
-- We need to implement a new write mechanism that will eliminate those problems and provide a convenient interface for publishing logs
+В текущей реализации запись происходит синхронно из кода приложения напрямую в CH, см. пример в `CreateUser` use case:
+
+С таким подходом возникли проблемы, некоторые из которых:
+- из-за отсутствия транзакционности события терялись в случае, если веб-воркер приложения умирал между завершением выполнения бизнес-логики и записью в CH
+- сетевые ошибки при записи в CH приводили к ошибкам на UI, что ухудшало UX
+- CH страдал от большого количества построчных записей (см. https://clickhouse.com/blog/common-getting-started-issues-with-clickhouse#many-small-inserts)
+
+Необходимо реализовать механизм записи, который позволит избавиться от перечисленных проблем, а также упростить написание и тестирование бизнес-логики через понятный интерфейс публикации событий
+
 
 
 ## Требования
