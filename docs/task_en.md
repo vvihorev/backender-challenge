@@ -5,7 +5,7 @@ Expected completion time: 3-5 hours
 Below a short description of a problem, along with several basic restrictions and requirements. The task will evaluate your ability to implement a solution using our tech stack, and we expect a well-documented and maintainable codebase that adheres to best practices.
 
 Deliverables
-- Repository: Fork the provided repository template and submit your work as a pull request via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
+- Repository: copy provided repository template and submit your work as a pull request (in new copied repository) via [this Typeform](https://hiretechfast.typeform.com/to/QZ55qiDi)
 - Documentation: Include a brief manual on how to set up the project with your changes. Provide documentation that explains your technical solution and design choices. Including an architectural diagram is optional but recommended.
 - Code Quality: Ensure your code is readable, maintainable, and formatted consistently.
 - Testing: Implement comprehensive unit tests for all new code. Use pytest with pytest-django for fixtures where appropriate.
