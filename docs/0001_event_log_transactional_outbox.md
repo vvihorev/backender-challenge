@@ -1,5 +1,7 @@
 # Technical Solution
 
+![image](https://github.com/user-attachments/assets/7699720c-cc91-40c8-9665-32fcdb78fd13)
+
 We use a [transactional outbox][1] pattern, writing event logs to the
 application database in a single transaction with the main event.
 
