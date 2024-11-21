@@ -4,6 +4,7 @@ from pathlib import Path
 import environ
 import sentry_sdk
 import structlog
+from celery.schedules import schedule
 
 env = environ.Env(
     DEBUG=(bool, False),
@@ -30,6 +31,7 @@ INSTALLED_APPS = [
 
     # project apps
     'users',
+    'event_logs',
 ]
 
 MIDDLEWARE = [
@@ -110,8 +112,15 @@ STATIC_ROOT = env("STATIC_ROOT")
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-CELERY_BROKER = env("CELERY_BROKER", default="redis://localhost:6379/0")
+CELERY_BROKER = env("CELERY_BROKER", default="redis://redis:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://redis:6379/0")
 CELERY_ALWAYS_EAGER = env("CELERY_ALWAYS_EAGER", default=DEBUG)
+CELERY_BEAT_SCHEDULE = {
+    "pull_outbox_events_log": {
+        "task": "event_logs.tasks.pull_outbox_events_log",
+        "schedule": schedule(env("PROCESS_EVENT_LOG_OUTBOX_INTERVAL", default=10.0)),
+    },
+}
 
 LOG_FORMATTER = env("LOG_FORMATTER", default="console")
 LOG_LEVEL = env("LOG_LEVEL", default="INFO")

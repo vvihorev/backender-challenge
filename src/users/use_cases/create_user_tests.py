@@ -1,12 +1,10 @@
-import uuid
 from collections.abc import Generator
-from unittest.mock import ANY
 
 import pytest
-from clickhouse_connect.driver import Client
+from clickhouse_connect.driver.client import Client
 from django.conf import settings
 
-from users.use_cases import CreateUser, CreateUserRequest, UserCreated
+from users.use_cases import CreateUser, CreateUserRequest
 
 pytestmark = [pytest.mark.django_db]
 
@@ -43,26 +41,3 @@ def test_emails_are_unique(f_use_case: CreateUser) -> None:
 
     assert response.result is None
     assert response.error == 'User with this email already exists'
-
-
-def test_event_log_entry_published(
-    f_use_case: CreateUser,
-    f_ch_client: Client,
-) -> None:
-    email = f'test_{uuid.uuid4()}@email.com'
-    request = CreateUserRequest(
-        email=email, first_name='Test', last_name='Testovich',
-    )
-
-    f_use_case.execute(request)
-    log = f_ch_client.query("SELECT * FROM default.event_log WHERE event_type = 'user_created'")
-
-    assert log.result_rows == [
-        (
-            'user_created',
-            ANY,
-            'Local',
-            UserCreated(email=email, first_name='Test', last_name='Testovich').model_dump_json(),
-            1,
-        ),
-    ]

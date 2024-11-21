@@ -7,9 +7,9 @@ import clickhouse_connect
 import structlog
 from clickhouse_connect.driver.exceptions import DatabaseError
 from django.conf import settings
-from django.utils import timezone
 
 from core.base_model import Model
+from event_logs.models import EventLogModel
 
 logger = structlog.get_logger(__name__)
 
@@ -19,6 +19,40 @@ EVENT_LOG_COLUMNS = [
     'environment',
     'event_context',
 ]
+
+
+def _to_snake_case(event_name: str) -> str:
+    result = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", event_name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", result).lower()
+
+
+def log_events(data: list[Model]) -> None:
+    for event in data:
+        EventLogModel.objects.create(
+            event_type=_to_snake_case(event.__class__.__name__),
+            event_context=event.model_dump_json(),
+        )
+
+
+def pull_logged_events(client: clickhouse_connect.driver.Client) -> None:
+    events = EventLogModel.objects.order_by("event_date_time")[:1000]
+
+    if events.count() == 0:
+        logger.info("no log events found when pulling outbox")
+        return
+
+    events_data = events.values_list(*EVENT_LOG_COLUMNS)
+    ic = client.create_insert_context(
+        column_names=EVENT_LOG_COLUMNS,
+        database=settings.CLICKHOUSE_SCHEMA,
+        table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
+    )
+    for event, event_data in zip(events, events_data, strict=False):
+        logger.info(event=event, data=event_data)
+        ic.data = [event_data]
+        client.insert(context=ic)
+        event.delete()
+    logger.info("pulled events from the outbox", count=events.count())
 
 
 class EventLogClient:
@@ -44,20 +78,6 @@ class EventLogClient:
         finally:
             client.close()
 
-    def insert(
-        self,
-        data: list[Model],
-    ) -> None:
-        try:
-            self._client.insert(
-                data=self._convert_data(data),
-                column_names=EVENT_LOG_COLUMNS,
-                database=settings.CLICKHOUSE_SCHEMA,
-                table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
-            )
-        except DatabaseError as e:
-            logger.error('unable to insert data to clickhouse', error=str(e))
-
     def query(self, query: str) -> Any:  # noqa: ANN401
         logger.debug('executing clickhouse query', query=query)
 
@@ -66,19 +86,3 @@ class EventLogClient:
         except DatabaseError as e:
             logger.error('failed to execute clickhouse query', error=str(e))
             return
-
-    def _convert_data(self, data: list[Model]) -> list[tuple[Any]]:
-        return [
-            (
-                self._to_snake_case(event.__class__.__name__),
-                timezone.now(),
-                settings.ENVIRONMENT,
-                event.model_dump_json(),
-            )
-            for event in data
-        ]
-
-    def _to_snake_case(self, event_name: str) -> str:
-        result = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', event_name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', result).lower()
-
