@@ -6,6 +6,7 @@ services:
     restart: always
     depends_on:
       - db
+      - redis
       - clickhouse
     command: [ "../docker/wait-for-it.sh", "db:5432", "--", "python", "manage.py", "runserver", "0.0.0.0:8000" ]
     ports:
@@ -44,6 +45,35 @@ services:
     volumes:
       - ./docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    networks:
+      - default
+    depends_on:
+      - redis
+    environment:
+      - BROKER_URL=redis://redis:6379/0
+    command: ['celery', '-A', 'core', 'worker', '-l', 'info']
+    volumes:
+      - ./:/app/
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    networks:
+      - default
+    depends_on:
+      - redis
+    environment:
+      - BROKER_URL=redis://redis:6379/0
+    command: ['celery', '-A', 'core', 'beat', '-l', 'info']
+    volumes:
+      - ./:/app/
 
 volumes:
   dev-db-data: {}
