@@ -12,11 +12,9 @@ According to a [blog post][2] by ClickHouse, in the observability use case, it
 makes sense to use asynchronous inserts, for which batching is performed on the
 side of the database, and not on the client.
 
-It is suggested to enable async inserts for a separate user, as seen in [3]. An
-alternative approach would be to switch to using `clickhouse-driver` and
-enabling async inserts on a per-query basis.
-
-# Links
+It is suggested to enable async inserts for a separate user, as seen in 
+[enabling async inserts guide][3]. Analternative approach would be to switch to
+using `clickhouse-driver` and enabling async inserts on a per-query basis.
 
 [1]: https://microservices.io/patterns/data/transactional-outbox.html
 [2]: https://clickhouse.com/blog/asynchronous-data-inserts-in-clickhouse#sometimes-client-side-batching-is-not-feasible
