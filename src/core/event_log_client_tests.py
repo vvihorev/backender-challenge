@@ -6,17 +6,11 @@ import pytest
 from clickhouse_connect.driver import Client
 from django.conf import settings
 
-from core.event_log_client import pull_logged_events
+from core.base_model import Model
+from core.event_log_client import EventLogClient
 from event_logs.models import EventLogModel
-from users.models import User
-from users.use_cases import CreateUser, CreateUserRequest, UserCreated
 
 pytestmark = [pytest.mark.django_db]
-
-
-@pytest.fixture()
-def f_use_case() -> CreateUser:
-    return CreateUser()
 
 
 @pytest.fixture(autouse=True)
@@ -25,57 +19,61 @@ def f_clean_up_event_log(f_ch_client: Client) -> Generator:
     yield
 
 
-def test_event_log_entry_not_published_immediately(
-    f_use_case: CreateUser,
-    f_ch_client: Client,
-) -> None:
-    email = f'test_{uuid.uuid4()}@email.com'
-    request = CreateUserRequest(
-        email=email, first_name='Test', last_name='Testovich',
-    )
+class TestEvent(Model):
+    text: str
 
-    f_use_case.execute(request)
-    log = f_ch_client.query("SELECT * FROM default.event_log WHERE event_type = 'user_created'")
+
+def test_event_log_entry_not_published_immediately(f_ch_client: Client) -> None:
+    EventLogClient.log_events([TestEvent(text="unpublished test event")])
+
+    log = f_ch_client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
 
     assert log.result_rows == []
 
 
-def test_event_log_outbox_entry_created(
-    f_use_case: CreateUser,
-) -> None:
-    email = f'test_{uuid.uuid4()}@email.com'
-    request = CreateUserRequest(
-        email=email, first_name='Test', last_name='Testovich',
-    )
-    init_user_count = User.objects.count()
-    init_event_log_count = EventLogModel.objects.count() == 1
+def test_event_log_outbox_entry_created() -> None:
+    init_event_log_count = EventLogModel.objects.count()
 
-    f_use_case.execute(request)
+    EventLogClient.log_events([TestEvent(text="test event")])
 
-    assert User.objects.count() == init_user_count + 1
     assert EventLogModel.objects.count() == init_event_log_count + 1
+    assert EventLogModel.objects.filter().first().is_published == False
 
 
-def test_event_log_pulled_to_clickhouse(
-    f_use_case: CreateUser,
-    f_ch_client: Client,
-) -> None:
-    email = f'test_{uuid.uuid4()}@email.com'
-    request = CreateUserRequest(
-        email=email, first_name='Test', last_name='Testovich',
-    )
+def test_event_log_pulled_and_published_to_clickhouse(f_ch_client: Client) -> None:
+    client = EventLogClient(f_ch_client)
+    client.log_events([TestEvent(text="published test event")])
 
-    f_use_case.execute(request)
-    pull_logged_events(f_ch_client)
-    log = f_ch_client.query("SELECT * FROM default.event_log WHERE event_type = 'user_created'")
+    client.pull_and_publish_logged_events()
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
 
-    assert EventLogModel.objects.count() == 0
-    assert log.result_rows == [
+    assert EventLogModel.objects.count() == 1
+    assert EventLogModel.objects.filter().first().is_published == True
+    assert log == [
         (
-            'user_created',
+            'test_event',
             ANY,
             'Local',
-            UserCreated(email=email, first_name='Test', last_name='Testovich').model_dump_json(),
+            TestEvent(text="published test event").model_dump_json(),
+            1,
+        ),
+    ]
+
+
+def test_events_are_published_once(f_ch_client: Client) -> None:
+    client = EventLogClient(f_ch_client)
+    client.log_events([TestEvent(text="published test event")])
+
+    client.pull_and_publish_logged_events()
+    client.pull_and_publish_logged_events()
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+
+    assert log == [
+        (
+            'test_event',
+            ANY,
+            'Local',
+            TestEvent(text="published test event").model_dump_json(),
             1,
         ),
     ]
