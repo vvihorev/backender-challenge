@@ -4,7 +4,7 @@ import structlog
 from django.db import transaction
 
 from core.base_model import Model
-from core.event_log_client import log_events
+from core.event_log_client import EventLogClient
 from core.use_case import UseCase, UseCaseRequest, UseCaseResponse
 from users.models import User
 
@@ -49,7 +49,7 @@ class CreateUser(UseCase):
 
             if created:
                 logger.info('user has been created')
-                log_events([
+                EventLogClient.log_events([
                     UserCreated(
                         email=user.email,
                         first_name=user.first_name,

@@ -7,6 +7,7 @@ import clickhouse_connect
 import structlog
 from clickhouse_connect.driver.exceptions import DatabaseError
 from django.conf import settings
+from sentry_sdk import capture_exception
 
 from core.base_model import Model
 from event_logs.models import EventLogModel
@@ -19,19 +20,6 @@ EVENT_LOG_COLUMNS = [
     'environment',
     'event_context',
 ]
-
-
-def _to_snake_case(event_name: str) -> str:
-    result = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", event_name)
-    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", result).lower()
-
-
-def log_events(data: list[Model]) -> None:
-    for event in data:
-        EventLogModel.objects.create(
-            event_type=_to_snake_case(event.__class__.__name__),
-            event_context=event.model_dump_json(),
-        )
 
 
 class EventLogClient:
@@ -53,6 +41,7 @@ class EventLogClient:
         try:
             yield cls(client)
         except Exception as e:
+            capture_exception(e)
             logger.error('error while executing clickhouse query', error=str(e))
         finally:
             client.close()
@@ -65,6 +54,15 @@ class EventLogClient:
         except DatabaseError as e:
             logger.error('failed to execute clickhouse query', error=str(e))
             return
+
+    @staticmethod
+    def log_events(data: list[Model]) -> None:
+        for event in data:
+            EventLogModel.objects.create(
+                event_type=EventLogClient._to_snake_case(event.__class__.__name__),
+                event_context=event.model_dump_json(),
+            )
+
     def pull_and_publish_logged_events(self) -> None:
         events = EventLogModel.objects.filter(
             is_published=False
@@ -90,3 +88,8 @@ class EventLogClient:
             "pulled and published events from the outbox",
             count=events.count()
         )
+
+    @staticmethod
+    def _to_snake_case(event_name: str) -> str:
+        result = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", event_name)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", result).lower()
