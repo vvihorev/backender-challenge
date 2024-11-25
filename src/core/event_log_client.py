@@ -34,27 +34,6 @@ def log_events(data: list[Model]) -> None:
         )
 
 
-def pull_logged_events(client: clickhouse_connect.driver.Client) -> None:
-    events = EventLogModel.objects.order_by("event_date_time")[:1000]
-
-    if events.count() == 0:
-        logger.info("no log events found when pulling outbox")
-        return
-
-    events_data = events.values_list(*EVENT_LOG_COLUMNS)
-    ic = client.create_insert_context(
-        column_names=EVENT_LOG_COLUMNS,
-        database=settings.CLICKHOUSE_SCHEMA,
-        table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
-    )
-    for event, event_data in zip(events, events_data, strict=False):
-        logger.info(event=event, data=event_data)
-        ic.data = [event_data]
-        client.insert(context=ic)
-        event.delete()
-    logger.info("pulled events from the outbox", count=events.count())
-
-
 class EventLogClient:
     def __init__(self, client: clickhouse_connect.driver.Client) -> None:
         self._client = client
@@ -86,3 +65,28 @@ class EventLogClient:
         except DatabaseError as e:
             logger.error('failed to execute clickhouse query', error=str(e))
             return
+    def pull_and_publish_logged_events(self) -> None:
+        events = EventLogModel.objects.filter(
+            is_published=False
+        ).order_by("event_date_time")[:1000]
+
+        if events.count() == 0:
+            logger.info("no log events found when pulling outbox")
+            return
+
+        events_data = events.values_list(*EVENT_LOG_COLUMNS)
+        ic = self._client.create_insert_context(
+            column_names=EVENT_LOG_COLUMNS,
+            database=settings.CLICKHOUSE_SCHEMA,
+            table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
+        )
+        for event, event_data in zip(events, events_data, strict=False):
+            logger.info(event=event, data=event_data)
+            ic.data = [event_data]
+            self._client.insert(context=ic)
+            event.is_published = True
+            event.save()
+        logger.info(
+            "pulled and published events from the outbox",
+            count=events.count()
+        )
