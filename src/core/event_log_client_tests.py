@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Generator
 from unittest.mock import ANY
 
@@ -60,7 +59,7 @@ def test_event_log_pulled_and_published_to_clickhouse(f_ch_client: Client) -> No
     ]
 
 
-def test_events_are_published_once(f_ch_client: Client) -> None:
+def test_events_are_marked_as_published(f_ch_client: Client) -> None:
     client = EventLogClient(f_ch_client)
     client.log_events([TestEvent(text="published test event")])
 
@@ -78,3 +77,74 @@ def test_events_are_published_once(f_ch_client: Client) -> None:
         ),
     ]
 
+
+def test_events_are_published_in_batches(f_ch_client: Client) -> None:
+    settings.EVENT_LOG_OUTBOX_MAX_BATCH_SIZE = 2
+    client = EventLogClient(f_ch_client)
+    client.log_events([
+        TestEvent(text="first"),
+        TestEvent(text="second"),
+        TestEvent(text="third"),
+    ])
+
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+    assert log == []
+
+    client.pull_and_publish_logged_events()
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+    assert log == [
+        (
+            'test_event',
+            ANY,
+            'Local',
+            TestEvent(text="first").model_dump_json(),
+            1,
+        ),
+        (
+            'test_event',
+            ANY,
+            'Local',
+            TestEvent(text="second").model_dump_json(),
+            1,
+        ),
+    ]
+
+    client.pull_and_publish_logged_events()
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+    assert len(log) == 3
+
+
+def test_events_are_published_atomically(f_ch_client: Client) -> None:
+    settings.EVENT_LOG_OUTBOX_MAX_BATCH_SIZE = 2
+    client = EventLogClient(f_ch_client)
+    client.log_events([
+        TestEvent(text="first"),
+        TestEvent(text="second"),
+        TestEvent(text="third"),
+    ])
+
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+    assert log == []
+
+    client.pull_and_publish_logged_events()
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+    assert log == [
+        (
+            'test_event',
+            ANY,
+            'Local',
+            TestEvent(text="first").model_dump_json(),
+            1,
+        ),
+        (
+            'test_event',
+            ANY,
+            'Local',
+            TestEvent(text="second").model_dump_json(),
+            1,
+        ),
+    ]
+
+    client.pull_and_publish_logged_events()
+    log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
+    assert len(log) == 3

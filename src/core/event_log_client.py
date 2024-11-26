@@ -66,24 +66,20 @@ class EventLogClient:
     def pull_and_publish_logged_events(self) -> None:
         events = EventLogModel.objects.filter(
             is_published=False
-        ).order_by("event_date_time")[:1000]
+        ).order_by("event_date_time")[:settings.EVENT_LOG_OUTBOX_MAX_BATCH_SIZE]
 
         if events.count() == 0:
             logger.info("no log events found when pulling outbox")
             return
 
-        events_data = events.values_list(*EVENT_LOG_COLUMNS)
-        ic = self._client.create_insert_context(
+        self._client.insert(
+            data=events.values_list(*EVENT_LOG_COLUMNS),
             column_names=EVENT_LOG_COLUMNS,
             database=settings.CLICKHOUSE_SCHEMA,
             table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
         )
-        for event, event_data in zip(events, events_data, strict=False):
-            logger.info(event=event, data=event_data)
-            ic.data = [event_data]
-            self._client.insert(context=ic)
-            event.is_published = True
-            event.save()
+        EventLogModel.objects.filter(pk__in=events.values("pk")).update(is_published=True)
+
         logger.info(
             "pulled and published events from the outbox",
             count=events.count()
