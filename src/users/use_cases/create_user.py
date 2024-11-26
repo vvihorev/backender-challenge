@@ -1,6 +1,7 @@
 from typing import Any
 
 import structlog
+from django.db import transaction
 
 from core.base_model import Model
 from core.event_log_client import EventLogClient
@@ -38,30 +39,24 @@ class CreateUser(UseCase):
     def _execute(self, request: CreateUserRequest) -> CreateUserResponse:
         logger.info('creating a new user')
 
-        user, created = User.objects.get_or_create(
-            email=request.email,
-            defaults={
-                'first_name': request.first_name, 'last_name': request.last_name,
-            },
-        )
+        with transaction.atomic():
+            user, created = User.objects.get_or_create(
+                email=request.email,
+                defaults={
+                    'first_name': request.first_name, 'last_name': request.last_name,
+                },
+            )
 
-        if created:
-            logger.info('user has been created')
-            self._log(user)
-            return CreateUserResponse(result=user)
-
-        logger.error('unable to create a new user')
-        return CreateUserResponse(error='User with this email already exists')
-
-    def _log(self, user: User) -> None:
-        with EventLogClient.init() as client:
-            client.insert(
-                data=[
+            if created:
+                logger.info('user has been created')
+                EventLogClient.log_events([
                     UserCreated(
                         email=user.email,
                         first_name=user.first_name,
                         last_name=user.last_name,
                     ),
-                ],
-            )
+                ])
+                return CreateUserResponse(result=user)
 
+        logger.error('unable to create a new user')
+        return CreateUserResponse(error='User with this email already exists')

@@ -7,9 +7,10 @@ import clickhouse_connect
 import structlog
 from clickhouse_connect.driver.exceptions import DatabaseError
 from django.conf import settings
-from django.utils import timezone
+from sentry_sdk import capture_exception
 
 from core.base_model import Model
+from event_logs.models import EventLogModel
 
 logger = structlog.get_logger(__name__)
 
@@ -40,23 +41,10 @@ class EventLogClient:
         try:
             yield cls(client)
         except Exception as e:
+            capture_exception(e)
             logger.error('error while executing clickhouse query', error=str(e))
         finally:
             client.close()
-
-    def insert(
-        self,
-        data: list[Model],
-    ) -> None:
-        try:
-            self._client.insert(
-                data=self._convert_data(data),
-                column_names=EVENT_LOG_COLUMNS,
-                database=settings.CLICKHOUSE_SCHEMA,
-                table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
-            )
-        except DatabaseError as e:
-            logger.error('unable to insert data to clickhouse', error=str(e))
 
     def query(self, query: str) -> Any:  # noqa: ANN401
         logger.debug('executing clickhouse query', query=query)
@@ -67,18 +55,37 @@ class EventLogClient:
             logger.error('failed to execute clickhouse query', error=str(e))
             return
 
-    def _convert_data(self, data: list[Model]) -> list[tuple[Any]]:
-        return [
-            (
-                self._to_snake_case(event.__class__.__name__),
-                timezone.now(),
-                settings.ENVIRONMENT,
-                event.model_dump_json(),
+    @staticmethod
+    def log_events(data: list[Model]) -> None:
+        for event in data:
+            EventLogModel.objects.create(
+                event_type=EventLogClient._to_snake_case(event.__class__.__name__),
+                event_context=event.model_dump_json(),
             )
-            for event in data
-        ]
 
-    def _to_snake_case(self, event_name: str) -> str:
-        result = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', event_name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', result).lower()
+    def pull_and_publish_logged_events(self) -> None:
+        events = EventLogModel.objects.filter(
+            is_published=False,
+        ).order_by("event_date_time")[:settings.EVENT_LOG_OUTBOX_MAX_BATCH_SIZE]
 
+        if events.count() == 0:
+            logger.info("no log events found when pulling outbox")
+            return
+
+        self._client.insert(
+            data=events.values_list(*EVENT_LOG_COLUMNS),
+            column_names=EVENT_LOG_COLUMNS,
+            database=settings.CLICKHOUSE_SCHEMA,
+            table=settings.CLICKHOUSE_EVENT_LOG_TABLE_NAME,
+        )
+        EventLogModel.objects.filter(pk__in=events.values("pk")).update(is_published=True)
+
+        logger.info(
+            "pulled and published events from the outbox",
+            count=events.count(),
+        )
+
+    @staticmethod
+    def _to_snake_case(event_name: str) -> str:
+        result = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", event_name)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", result).lower()
