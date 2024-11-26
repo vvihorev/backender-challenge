@@ -65,7 +65,7 @@ class EventLogClient:
 
     def pull_and_publish_logged_events(self) -> None:
         events = EventLogModel.objects.filter(
-            is_published=False
+            is_published=False,
         ).order_by("event_date_time")[:settings.EVENT_LOG_OUTBOX_MAX_BATCH_SIZE]
 
         if events.count() == 0:
@@ -82,7 +82,7 @@ class EventLogClient:
 
         logger.info(
             "pulled and published events from the outbox",
-            count=events.count()
+            count=events.count(),
         )
 
     @staticmethod

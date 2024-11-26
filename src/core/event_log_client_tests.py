@@ -36,7 +36,7 @@ def test_event_log_outbox_entry_created() -> None:
     EventLogClient.log_events([TestEvent(text="test event")])
 
     assert EventLogModel.objects.count() == init_event_log_count + 1
-    assert EventLogModel.objects.filter().first().is_published == False
+    assert not EventLogModel.objects.filter().first().is_published
 
 
 def test_event_log_pulled_and_published_to_clickhouse(f_ch_client: Client) -> None:
@@ -47,7 +47,7 @@ def test_event_log_pulled_and_published_to_clickhouse(f_ch_client: Client) -> No
     log = client.query("SELECT * FROM default.event_log WHERE event_type = 'test_event'")
 
     assert EventLogModel.objects.count() == 1
-    assert EventLogModel.objects.filter().first().is_published == True
+    assert EventLogModel.objects.filter().first().is_published
     assert log == [
         (
             'test_event',
